@@ -1,18 +1,108 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Feather } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
+import { useCallback } from "react";
+import { Dimensions, Platform, SafeAreaView, StyleSheet } from "react-native";
+import {
+  GestureHandlerRootView,
+  PanGestureHandler,
+  PanGestureHandlerGestureEvent,
+} from "react-native-gesture-handler";
+import Animated, {
+  Extrapolate,
+  interpolate,
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const THRESHOLD = SCREEN_WIDTH / 3;
 
 export default function App() {
+  const translateX = useSharedValue(0);
+
+  const panGestureEvent = useAnimatedGestureHandler<
+    PanGestureHandlerGestureEvent,
+    { x: number }
+  >({
+    onStart: (_, context) => {
+      context.x = translateX.value;
+    },
+    onActive: (event, context) => {
+      translateX.value = Math.max(event.translationX + context.x, 0);
+    },
+    onEnd: () => {
+      if (translateX.value <= THRESHOLD) translateX.value = withTiming(0);
+      else translateX.value = withTiming(SCREEN_WIDTH / 2);
+    },
+  });
+
+  const rStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(
+      translateX.value,
+      [0, SCREEN_WIDTH / 2],
+      [0, 3],
+      Extrapolate.CLAMP
+    );
+
+    const borderRadius = interpolate(
+      translateX.value,
+      [0, SCREEN_WIDTH / 2],
+      [0, 15],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      borderRadius,
+      transform: [
+        { perspective: -100 },
+        { translateX: translateX.value },
+        { rotateY: `-${rotate}deg` },
+      ],
+    };
+  }, []);
+
+  const onPress = useCallback(() => {
+    if (translateX.value > 0) {
+      translateX.value = withTiming(0);
+    } else {
+      translateX.value = withTiming(SCREEN_WIDTH / 2);
+    }
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-    </View>
+    <GestureHandlerRootView
+      style={{ flex: 1, backgroundColor: BACKGROUND_COLOR }}
+    >
+      <SafeAreaView style={[styles.container, styles.safe]}>
+        <StatusBar style="inverted" />
+        <PanGestureHandler onGestureEvent={panGestureEvent}>
+          <Animated.View
+            style={[{ backgroundColor: "white", flex: 1 }, rStyle]}
+          >
+            <Feather
+              name="menu"
+              size={32}
+              color={BACKGROUND_COLOR}
+              style={{ margin: 15 }}
+              onPress={onPress}
+            />
+          </Animated.View>
+        </PanGestureHandler>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
+
+const BACKGROUND_COLOR = "#1e1e23";
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: BACKGROUND_COLOR,
+  },
+  safe: {
+    marginTop: Platform.OS === "android" ? 30 : 0,
   },
 });
